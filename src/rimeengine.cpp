@@ -175,17 +175,29 @@ RimeEngine::RimeEngine(Instance *instance)
     : instance_(instance), api_(EnsureRimeApi()),
       factory_([this](InputContext &ic) { return new RimeState(this, ic); }),
       sessionPool_(this, getSharedStatePolicy()) {
-    if constexpr (isAndroid() || isApple()) {
-        const auto &sp = fcitx::StandardPath::global();
-        std::string defaultYaml = sp.locate(fcitx::StandardPath::Type::Data,
-                                            "rime-data/default.yaml");
-        if (defaultYaml.empty()) {
-            throw std::runtime_error("Fail to locate shared data directory");
+
+    // First we detect the shared data directory via XDG_DATA_DIRS and
+    // XDG_DATA_HOME, if not found, we use RIEM_DATA_DIR as fallback. So
+    // that users can use XDG_DATA_DIRS to override the shared data.
+    this->sharedDataDir_ = []() -> std::string {
+        std::string pathToDefault = fcitx::StandardPath::global().locate(
+            fcitx::StandardPath::Type::Data, "rime-data/default.yaml");
+
+        if (pathToDefault.empty()) {
+            if (!std::string(RIME_DATA_DIR).empty()) {
+                // Use RIEM_DATA_DIR as fallback
+                return RIME_DATA_DIR;
+            } else {
+                // If we can't detect the shared data directory, we throw an
+                // exception
+                throw std::runtime_error(
+                    "Fail to locate shared data directory");
+            }
+        } else {
+            return fcitx::fs::dirName(pathToDefault);
         }
-        sharedDataDir_ = fcitx::fs::dirName(defaultYaml);
-    } else {
-        sharedDataDir_ = RIME_DATA_DIR;
-    }
+    }();
+
     imAction_ = std::make_unique<IMAction>(this);
     instance_->userInterfaceManager().registerAction("fcitx-rime-im",
                                                      imAction_.get());
