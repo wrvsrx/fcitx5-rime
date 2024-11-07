@@ -8,3 +8,7 @@ build/*
 tags
 astyle.sh
 .cache
+
+/.direnv
+/result
+/.envrc
