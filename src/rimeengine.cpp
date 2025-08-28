@@ -179,17 +179,18 @@ RimeEngine::RimeEngine(Instance *instance)
     : instance_(instance), api_(EnsureRimeApi()),
       factory_([this](InputContext &ic) { return new RimeState(this, ic); }),
       sessionPool_(this, getSharedStatePolicy()) {
-    if constexpr (isAndroid() || isApple()) {
-        const auto &sp = StandardPaths::global();
-        std::string defaultYaml =
-            sp.locate(StandardPathsType::Data, "rime-data/default.yaml");
-        if (defaultYaml.empty()) {
+    const auto &sp = StandardPaths::global();
+    std::string defaultYaml =
+        sp.locate(StandardPathsType::Data, "rime-data/default.yaml");
+    if (defaultYaml.empty()) {
+        // Use RIEM_DATA_DIR as fallback
+        if (fs::isreg(RIME_DATA_DIR "default.yaml")) {
+            defaultYaml = RIME_DATA_DIR "default.yaml";
+        } else {
             throw std::runtime_error("Fail to locate shared data directory");
         }
-        sharedDataDir_ = fcitx::fs::dirName(defaultYaml);
-    } else {
-        sharedDataDir_ = RIME_DATA_DIR;
     }
+    sharedDataDir_ = fcitx::fs::dirName(defaultYaml);
     imAction_ = std::make_unique<IMAction>(this);
     instance_->userInterfaceManager().registerAction("fcitx-rime-im",
                                                      imAction_.get());
